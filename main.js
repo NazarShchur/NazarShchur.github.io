@@ -20,6 +20,14 @@ let isWireframe = false;
 
 let eyeSepInput;
 
+const DEG_TO_RAD = Math.PI / 180; // Degree-to-Radian conversion
+
+const deviceOrientation = {
+    alpha: 0,
+    beta: 90,
+    gamma: 0
+}
+
 /* Draws a WebGL primitive.  The first parameter must be one of the constants
  * that specify primitives:  gl.POINTS, gl.LINES, gl.LINE_LOOP, gl.LINE_STRIP,
  * gl.TRIANGLES, gl.TRIANGLE_STRIP, gl.TRIANGLE_FAN.  The second parameter must
@@ -223,6 +231,42 @@ const drawSurface = () => {
     drawPrimitive(gl.LINES, [0, 0, 0, 0], [0, 0, 0, 0, 0, 0]);
 }
 
+function getRotationMatrix(alpha, beta, gamma) {
+    const _x = beta ? beta * DEG_TO_RAD : 0; // beta value
+    const _y = gamma ? gamma * DEG_TO_RAD : 0; // gamma value
+    const _z = alpha ? alpha * DEG_TO_RAD : 0; // alpha value
+
+    const cX = Math.cos(_x);
+    const cY = Math.cos(_y);
+    const cZ = Math.cos(_z);
+    const sX = Math.sin(_x);
+    const sY = Math.sin(_y);
+    const sZ = Math.sin(_z);
+
+    //
+    // ZXY rotation matrix construction.
+    //
+
+    const m11 = cZ * cY - sZ * sX * sY;
+    const m12 = -cX * sZ;
+    const m13 = cY * sZ * sX + cZ * sY;
+
+    const m21 = cY * sZ + cZ * sX * sY;
+    const m22 = cZ * cX;
+    const m23 = sZ * sY - cZ * cY * sX;
+
+    const m31 = -cX * sY;
+    const m32 = sX;
+    const m33 = cX * cY;
+
+    return [
+        m11, m12, m13, 0,
+        m21, m22, m23, 0,
+        m31, m32, m33, 0,
+        0, 0, 0, 1
+    ];
+}
+
 /* Draws a colored cube, along with a set of coordinate axes.
  * (Note that the use of the above drawPrimitive function is not an efficient
  * way to draw with WebGL.  Here, the geometry is so simple that it doesn't matter.)
@@ -244,14 +288,9 @@ function draw() {
         200000.0
     );
 
-    /* Get the view matrix from the SimpleRotator object.*/
-    let modelView = spaceball.getViewMatrix();
+    const translateToPointZero = m4.translation(0, 0, -15);
+    const matAccum1 = m4.multiply(translateToPointZero, getRotationMatrix(deviceOrientation.alpha, deviceOrientation.beta, deviceOrientation.gamma));
 
-    let rotateToPointZero = m4.axisRotation([0.707, 0.707, 0], 0.7);
-    let translateToPointZero = m4.translation(0, 0, -10);
-
-    let matAccum0 = m4.multiply(rotateToPointZero, modelView);
-    let matAccum1 = m4.multiply(translateToPointZero, matAccum0);
 
     /* Multiply the projection matrix times the modelview matrix to give the
        combined transformation matrix, and send that to the shader program. */
@@ -372,6 +411,13 @@ function init() {
         draw();
     });
 
+    window.addEventListener('deviceorientation', (e) => {
+        deviceOrientation.alpha = e.alpha;
+        deviceOrientation.beta = e.beta;
+        deviceOrientation.gamma = e.gamma;
+        draw()
+    });
+
     let canvas;
     try {
         canvas = document.getElementById("webglcanvas");
@@ -394,7 +440,6 @@ function init() {
         return;
     }
 
-    spaceball = new TrackballRotator(canvas, draw, 0);
 
     draw();
 }
